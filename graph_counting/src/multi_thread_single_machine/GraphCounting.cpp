@@ -180,6 +180,13 @@ int main(int argc, char *argv[]) {
 	    }
         }
     }
+	
+	cout << "odd cycle runs " << frequence <<" times "<<endl;
+    cout << "sample time: " << sample_time << " push time: " << sample_time << " tree time: " << tree_time << " (us) " << endl;
+    all_time = sample_time+sample_time+tree_time;
+    cout << "sample percent :" << sample_time/all_time  << endl;
+    cout << "push percent  :" << push_time/all_time  << endl;
+    cout << "tree percent :" << tree_time/all_time  << endl << endl;
 
     return 0;
 }
