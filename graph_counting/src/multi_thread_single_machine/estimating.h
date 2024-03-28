@@ -9,8 +9,15 @@
 #include <queue>
 #include <map>
 #include "assert.h"
+#include <sys/time.h>
+#include <chrono>
+#include <mutex>
 
 using namespace std;
+
+int frequence=0;
+double sample_time = 0 ,push_time = 0,tree_time = 0 ,all_time = 0;
+mutex sample,push,tree;
 
 /* SamplingTree strcuture
  * tree of nodes (vertex, probability)
@@ -45,10 +52,19 @@ SamplingTreeNode *odd_cycle_sampler(Graph &graph, uint32_t cycle_length, default
     //cout << "====== Start to sample a " << cycle_length << "-cycles" << endl;
     // default_random_engine rand_generator(std::chrono::system_clock::now().time_since_epoch().count());
     uint32_t ue_id, d_ue;
-
+    frequence ++;
+    
     // step 1: sample cycle_length/2 edges (u1, v1), (x, x), (x, x), ... u1 < v1
     vector <uint32_t> sample_edge_vector;
+    auto start_time = chrono::system_clock::now();
     Edge e1 = graph.edge_sampling(this_rand_generator);
+    auto end_time = chrono::system_clock::now();
+    auto duration = end_time - start_time;
+    sample.lock();
+    sample_time += duration.count();
+    sample.unlock();
+
+    start_time = chrono::system_clock::now();
     if (graph.vertex_before(e1.v_start, e1.v_end)) {
         sample_edge_vector.push_back(e1.v_start);
         sample_edge_vector.push_back(e1.v_end);
@@ -56,18 +72,36 @@ SamplingTreeNode *odd_cycle_sampler(Graph &graph, uint32_t cycle_length, default
         sample_edge_vector.push_back(e1.v_end);
         sample_edge_vector.push_back(e1.v_start);
     }
-
+    end_time = chrono::system_clock::now();
+    duration = end_time - start_time;
+    push.lock();
+    push_time += duration.count();
+    push.unlock();
     for (uint32_t j = 0 + 1; j < cycle_length / 2; j++) {
-        Edge sampled_edge = graph.edge_sampling(this_rand_generator);
+
+        start_time = chrono::system_clock::now();
+        Edge sampled_edge = graph.edge_sampling(this_rand_generator);  //测试二者的时间，看看随机生成是不是瓶颈
+        end_time = chrono::system_clock::now();
+        duration = end_time - start_time;
+        sample.lock();
+        sample_time += duration.count();
+        sample.unlock();
+
+        start_time = chrono::system_clock::now();
         sample_edge_vector.push_back(sampled_edge.v_start);
         sample_edge_vector.push_back(sampled_edge.v_end);
+        end_time = chrono::system_clock::now();
+        duration = end_time - start_time;
+        push.lock();
+        push_time += duration.count();
+        push.unlock();
     }
 
+    start_time = chrono::system_clock::now();
     SamplingTreeNode *root = new SamplingTreeNode(CycleRoot,
                                                   sample_edge_vector,
                                                   pow(graph.total_edges_, (cycle_length / 2)) / 2.0);
     assert(root != nullptr);
-
 
     // step 2: sample w1, a neighbor of u1
     ue_id = sample_edge_vector[0];
@@ -76,14 +110,22 @@ SamplingTreeNode *odd_cycle_sampler(Graph &graph, uint32_t cycle_length, default
     // cout << "cycle u1 degree: " << d_ue << endl;
 
     uniform_int_distribution <uint32_t> next_edge_distribution(0, d_ue - 1);
-
     for (uint32_t j = 0; j < ceil(d_ue / graph.sqrt_m); j++) {
         // step 2: sample an vertex from u1's neighbor
         vector <uint32_t> sampled_vertex_id;
         sampled_vertex_id.push_back(graph.retrieve_neighbor(ue_id, next_edge_distribution(this_rand_generator)));
         root->children.push_back(new SamplingTreeNode(CycleLeave, sampled_vertex_id, d_ue));
     }
-
+    end_time = chrono::system_clock::now();
+    duration = end_time - start_time;
+    tree.lock();
+    tree_time += duration.count();
+    tree.unlock();
+    // if(  (interval++) %1000 == 0){
+    //     cout<<" sample_time : "<<sample_time<<endl;
+    //     cout<<" push_time : "<<push_time<<endl;
+    //     cout<<" tree_time : "<<tree_time<<endl;
+    // }
     return root;
 }
 
